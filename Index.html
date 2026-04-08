@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poker Tournament Clock</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f4f0; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
+
+    button { font-family: inherit; font-size: 13px; cursor: pointer; border: 0.5px solid #ccc; border-radius: 8px; background: #fff; color: #1a1a1a; padding: 6px 12px; transition: background 0.12s; }
+    button:hover { background: #f0efeb; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    input { font-family: inherit; font-size: 14px; border: 0.5px solid #ccc; border-radius: 8px; padding: 7px 10px; background: #fff; color: #1a1a1a; outline: none; }
+    input:focus { border-color: #888; }
+
+    #setup { max-width: 520px; margin: 0 auto; }
+    #setup h2 { font-size: 18px; font-weight: 500; margin-bottom: 1.5rem; }
+    .col-labels { display: flex; gap: 8px; margin-bottom: 4px; }
+    .col-labels .cn { font-size: 12px; color: #888; flex: 1 1 auto; min-width: 0; }
+    .col-labels .ct { font-size: 12px; color: #888; width: 56px; flex: 0 0 56px; text-align: right; }
+    .col-labels .cx { width: 32px; flex: 0 0 32px; }
+    .player-entry { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .name-input { flex: 1 1 auto; min-width: 0; display: block; }
+    .bank-input { flex: 0 0 56px; width: 56px; min-width: 56px; max-width: 56px; text-align: center; display: block; }
+    .remove-btn { flex: 0 0 32px; background: none; border: none; color: #aaa; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 8px; cursor: pointer; }
+    .remove-btn:hover { background: #f0efeb; color: #c0392b; }
+    .section-label { font-size: 12px; font-weight: 500; color: #888; margin: 1.25rem 0 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
+    .stage-row { display: flex; align-items: center; gap: 8px; }
+    .stage-row label { font-size: 13px; width: 64px; flex: none; }
+    .stage-row input { flex: 1; min-width: 0; }
+    .stage-row span { font-size: 12px; color: #888; }
+    #add-player-btn { width: 100%; margin-bottom: 0.75rem; }
+    #start-btn { width: 100%; font-size: 15px; padding: 10px; }
+
+    #clock-view { display: none; max-width: 960px; margin: 0 auto; }
+    .clock-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+    .clock-top-left { display: flex; align-items: center; gap: 12px; }
+    .clock-top h2 { font-size: 18px; font-weight: 500; }
+    .hand-badge { font-size: 12px; font-weight: 500; background: #ece9e0; color: #666; border: 0.5px solid #ccc; border-radius: 8px; padding: 3px 10px; }
+
+    .stage-bar { display: flex; margin-bottom: 1rem; background: #ece9e0; border: 0.5px solid #ccc; border-radius: 12px; overflow: hidden; }
+    .stage-pip { flex: 1; text-align: center; padding: 8px 4px; font-size: 13px; color: #aaa; border-right: 0.5px solid #ccc; }
+    .stage-pip:last-child { border-right: none; }
+    .stage-pip.current { background: #fff; color: #1a1a1a; font-weight: 500; }
+    .stage-pip.done { color: #ccc; }
+
+    .stage-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    #next-stage-btn, #new-hand-btn { font-size: 13px; padding: 7px 16px; }
+    .street-clock-info { font-size: 12px; color: #888; margin-left: auto; }
+
+    #players-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+
+    .player-card { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 6px; }
+    .player-card.active { border: 2px solid #1D9E75; }
+    .player-card.folded { opacity: 0.45; background: #f5f4f0; }
+    .player-card.out { opacity: 0.28; pointer-events: none; }
+
+    .card-header { display: flex; align-items: center; justify-content: space-between; }
+    .player-name { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+    .folded-badge { font-size: 10px; font-weight: 500; background: #ece9e0; color: #888; border: 0.5px solid #ccc; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+
+    .hamburger-btn { background: none; border: none; cursor: pointer; padding: 4px 6px; border-radius: 8px; color: #aaa; flex: none; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center; }
+    .hamburger-btn:hover { background: #f0efeb; }
+    .hamburger-btn span { display: block; width: 14px; height: 1.5px; background: currentColor; border-radius: 2px; }
+
+    .timers-row { display: flex; align-items: flex-end; gap: 10px; }
+    .timer-block { display: flex; flex-direction: column; gap: 1px; }
+    .timer-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
+    .street-timer { font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; color: #1a1a1a; line-height: 1.1; }
+    .street-timer.active-phase { color: #1D9E75; }
+    .street-timer.done-phase { color: #ccc; }
+    .bank-timer { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; color: #aaa; line-height: 1.1; }
+    .bank-timer.active-phase { color: #1a1a1a; }
+    .bank-timer.warning { color: #D85A30; }
+    .bank-timer.zero { color: #ccc; }
+    .timer-sep { font-size: 22px; color: #ddd; padding-bottom: 2px; }
+
+    .card-actions { display: flex; gap: 6px; margin-top: 2px; }
+    .turn-btn { flex: 1; font-size: 12px; padding: 6px 4px; }
+    .turn-btn.active-btn { background: #1D9E75; color: #fff; border-color: #1D9E75; }
+    .turn-btn.active-btn:hover { background: #0F6E56; border-color: #0F6E56; }
+    .fold-btn { font-size: 12px; padding: 6px 10px; }
+    .fold-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .extra-controls { display: none; border-top: 0.5px solid #ddd; margin-top: 4px; padding-top: 8px; flex-direction: column; gap: 6px; }
+    .extra-controls.open { display: flex; }
+    .time-adj { display: flex; gap: 4px; }
+    .adj-btn { flex: 1; font-size: 12px; padding: 5px 2px; }
+    .ko-btn { width: 100%; font-size: 11px; padding: 4px; color: #aaa; background: none; border: 0.5px solid #ddd; border-radius: 8px; cursor: pointer; }
+    .ko-btn:hover { background: #fdf0f0; color: #a32d2d; border-color: #f09595; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="setup">
+    <h2>Poker tournament clock</h2>
+    <div class="col-labels">
+      <span class="cn">Player name</span>
+      <span class="ct">Bank (sec)</span>
+      <span class="cx"></span>
+    </div>
+    <div id="player-list"></div>
+    <button id="add-player-btn">+ Add player</button>
+    <div class="section-label">Street clock (seconds per turn)</div>
+    <div class="stage-grid">
+      <div class="stage-row"><label>Preflop</label><input type="number" id="b-preflop" value="20" min="0" max="999" step="5"/><span>sec</span></div>
+      <div class="stage-row"><label>Flop</label><input type="number" id="b-flop" value="30" min="0" max="999" step="5"/><span>sec</span></div>
+      <div class="stage-row"><label>Turn</label><input type="number" id="b-turn" value="30" min="0" max="999" step="5"/><span>sec</span></div>
+      <div class="stage-row"><label>River</label><input type="number" id="b-river" value="30" min="0" max="999" step="5"/><span>sec</span></div>
+    </div>
+    <button id="start-btn">Start tournament</button>
+  </div>
+
+  <div id="clock-view">
+    <div class="clock-top">
+      <div class="clock-top-left">
+        <h2>Tournament clock</h2>
+        <span class="hand-badge" id="hand-badge">Hand 1</span>
+      </div>
+      <button id="reset-btn">+ New tournament</button>
+    </div>
+    <div class="stage-bar">
+      <div class="stage-pip current" id="pip-0">Preflop</div>
+      <div class="stage-pip" id="pip-1">Flop</div>
+      <div class="stage-pip" id="pip-2">Turn</div>
+      <div class="stage-pip" id="pip-3">River</div>
+    </div>
+    <div class="stage-controls">
+      <button id="next-stage-btn">Next street →</button>
+      <button id="new-hand-btn">New hand</button>
+      <span class="street-clock-info" id="street-info"></span>
+    </div>
+    <div id="players-grid"></div>
+  </div>
+</div>
+
+<script>
+  const STAGES = ["Preflop", "Flop", "Turn", "River"];
+  let streetTimes = [20, 30, 30, 30];
+  let players = [];
+  let currentStage = 0;
+  let currentHand = 1;
+  let activeIndex = null;
+  let intervalId = null;
+
+  function fmt(s) {
+    if (s <= 0) return "0:00";
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m + ":" + String(sec).padStart(2, "0");
+  }
+
+  function stopActive() {
+    if (activeIndex !== null) {
+      players[activeIndex].active = false;
+      players[activeIndex].phase = "idle";
+      clearInterval(intervalId); intervalId = null; activeIndex = null;
+    }
+  }
+
+  function nextEligible(fromIndex) {
+    const n = players.length;
+    for (let step = 1; step < n; step++) {
+      const j = (fromIndex + step) % n;
+      if (!players[j].folded && !players[j].out && players[j].bank > 0) return j;
+    }
+    return -1;
+  }
+
+  function startPlayerTimer(i) {
+    if (activeIndex !== null) {
+      players[activeIndex].active = false;
+      players[activeIndex].phase = "idle";
+    }
+    clearInterval(intervalId); intervalId = null;
+    players[i].active = true;
+    players[i].phase = "street";
+    players[i].streetLeft = streetTimes[currentStage];
+    activeIndex = i;
+    intervalId = setInterval(() => tick(i), 1000);
+  }
+
+  function autoStartFirst() {
+    const i = players.findIndex(p => !p.folded && !p.out && p.bank > 0);
+    if (i === -1) return;
+    startPlayerTimer(i);
+  }
+
+  function startNewHand() {
+    stopActive();
+    currentStage = 0;
+    currentHand++;
+    // Move BTN to next non-knocked-out player
+    if (btnIndex !== null) {
+      const n = players.length;
+      for (let step = 1; step <= n; step++) {
+        const j = (btnIndex + step) % n;
+        if (!players[j].out) { btnIndex = j; break; }
+      }
+    }
+    players.forEach(p => { if (!p.out) { p.folded = false; p.phase = "idle"; p.active = false; } });
+    document.getElementById("hand-badge").textContent = "Hand " + currentHand;
+    document.getElementById("next-stage-btn").disabled = false;
+    updateStageBar();
+    renderCards();
+  }
+
+  function addPlayerRow(name = "", seconds = 60) {
+    const list = document.getElementById("player-list");
+    const row = document.createElement("div");
+    row.className = "player-entry";
+    row.innerHTML = `<input type="text" class="name-input" placeholder="Player name" value="${name}"><input type="number" class="bank-input" min="1" max="99999" value="${seconds}" step="5"><button class="remove-btn">×</button>`;
+    row.querySelector(".remove-btn").onclick = () => row.remove();
+    list.appendChild(row);
+  }
+
+  document.getElementById("add-player-btn").onclick = () => addPlayerRow();
+
+  document.getElementById("start-btn").onclick = () => {
+    streetTimes = [
+      parseInt(document.getElementById("b-preflop").value) || 20,
+      parseInt(document.getElementById("b-flop").value) || 30,
+      parseInt(document.getElementById("b-turn").value) || 30,
+      parseInt(document.getElementById("b-river").value) || 30,
+    ];
+    const rows = document.querySelectorAll(".player-entry");
+    players = [];
+    rows.forEach(row => {
+      const name = row.querySelector(".name-input").value.trim();
+      const secs = parseInt(row.querySelector(".bank-input").value) || 60;
+      if (name) players.push({ name, bank: secs, streetLeft: 0, phase: "idle", active: false, out: false, folded: false, menuOpen: false });
+    });
+    if (players.length < 2) { alert("Add at least 2 players."); return; }
+    currentStage = 0; currentHand = 1; activeIndex = null;
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("clock-view").style.display = "block";
+    document.getElementById("hand-badge").textContent = "Hand 1";
+    updateStageBar();
+    renderCards();
+  };
+
+  document.getElementById("reset-btn").onclick = () => {
+    stopActive(); players = []; currentStage = 0; currentHand = 1;
+    document.getElementById("setup").style.display = "block";
+    document.getElementById("clock-view").style.display = "none";
+    document.getElementById("next-stage-btn").disabled = false;
+  };
+
+  document.getElementById("next-stage-btn").onclick = () => {
+    if (currentStage >= 3) return;
+    stopActive();
+    currentStage++;
+    updateStageBar();
+    autoStartFirst();
+    renderCards();
+    if (currentStage === 3) document.getElementById("next-stage-btn").disabled = true;
+  };
+
+  document.getElementById("new-hand-btn").onclick = () => startNewHand();
+
+  function updateStageBar() {
+    STAGES.forEach((_, i) => {
+      const pip = document.getElementById("pip-" + i);
+      pip.className = "stage-pip" + (i === currentStage ? " current" : i < currentStage ? " done" : "");
+    });
+    document.getElementById("street-info").textContent = "Street clock: " + streetTimes[currentStage] + "s per turn";
+  }
+
+  function toggleMenu(i) {
+    players[i].menuOpen = !players[i].menuOpen;
+    const el = document.getElementById("extra-" + i);
+    if (el) el.className = "extra-controls" + (players[i].menuOpen ? " open" : "");
+  }
+
+  function renderCards() {
+    const grid = document.getElementById("players-grid");
+    grid.innerHTML = "";
+    players.forEach((p, i) => {
+      const streetDisplay = p.phase === "bank" ? "0:00" : (p.active && p.phase === "street" ? fmt(p.streetLeft) : fmt(streetTimes[currentStage]));
+      const bankDisplay = fmt(p.bank);
+      const streetClass = "street-timer" + (p.phase === "street" && p.active ? " active-phase" : p.phase === "bank" ? " done-phase" : "");
+      const bankClass = "bank-timer" + (p.phase === "bank" && p.active ? " active-phase" : "") + (p.bank < 30 && p.bank > 0 ? " warning" : "") + (p.bank <= 0 ? " zero" : "");
+      const btnLabel = p.active ? "Stop turn" : "It's my turn";
+      const btnClass = "turn-btn" + (p.active ? " active-btn" : "");
+      const turnDisabled = ((p.bank <= 0 && p.phase !== "street") || p.out || p.folded) ? "disabled" : "";
+      const foldDisabled = (p.out || p.folded) ? "disabled" : "";
+      const extraClass = "extra-controls" + (p.menuOpen ? " open" : "");
+
+      const card = document.createElement("div");
+      card.className = "player-card" + (p.active ? " active" : "") + (p.folded ? " folded" : "") + (p.out ? " out" : "");
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="player-name">${p.name}${p.folded ? '<span class="folded-badge">folded</span>' : ""}</div>
+          <button class="hamburger-btn" onclick="toggleMenu(${i})"><span></span><span></span><span></span></button>
+        </div>
+        <div class="timers-row">
+          <div class="timer-block"><span class="timer-label">Street</span><span class="${streetClass}" id="st-${i}">${streetDisplay}</span></div>
+          <span class="timer-sep">|</span>
+          <div class="timer-block"><span class="timer-label">Time bank</span><span class="${bankClass}" id="bk-${i}">${bankDisplay}</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="${btnClass}" onclick="toggleTurn(${i})" ${turnDisabled}>${btnLabel}</button>
+          <button class="fold-btn" onclick="foldPlayer(${i})" ${foldDisabled}>Fold</button>
+        </div>
+        <div class="${extraClass}" id="extra-${i}">
+          <div class="time-adj">
+            <button class="adj-btn" onclick="adjustBank(${i}, -30)">−30s bank</button>
+            <button class="adj-btn" onclick="adjustBank(${i}, 30)">+30s bank</button>
+          </div>
+          <button class="ko-btn" onclick="knockOut(${i})">Knock out</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function toggleTurn(i) {
+    if (activeIndex === i) {
+      players[i].active = false; players[i].phase = "idle";
+      clearInterval(intervalId); intervalId = null; activeIndex = null;
+    } else {
+      if (activeIndex !== null) { players[activeIndex].active = false; players[activeIndex].phase = "idle"; }
+      players[i].active = true; players[i].phase = "street";
+      players[i].streetLeft = streetTimes[currentStage];
+      activeIndex = i;
+      clearInterval(intervalId);
+      intervalId = setInterval(() => tick(i), 1000);
+    }
+    renderCards();
+  }
+
+  function foldPlayer(i) {
+    if (players[i].folded || players[i].out) return;
+    const wasActive = activeIndex === i;
+    players[i].active = false;
+    players[i].phase = "idle";
+    players[i].folded = true;
+    if (wasActive) {
+      clearInterval(intervalId); intervalId = null; activeIndex = null;
+      const next = nextEligible(i);
+      if (next !== -1) startPlayerTimer(next);
+    }
+    renderCards();
+  }
+
+  function tick(i) {
+    const p = players[i];
+    if (p.phase === "street") {
+      p.streetLeft--;
+      const el = document.getElementById("st-" + i);
+      if (el) el.textContent = fmt(p.streetLeft);
+      if (p.streetLeft <= 0) {
+        p.phase = "bank";
+        if (el) { el.textContent = "0:00"; el.className = "street-timer done-phase"; }
+        const bk = document.getElementById("bk-" + i);
+        if (bk) bk.className = "bank-timer active-phase" + (p.bank < 30 ? " warning" : "") + (p.bank <= 0 ? " zero" : "");
+      }
+    } else if (p.phase === "bank") {
+      if (p.bank > 0) {
+        p.bank--;
+        const bk = document.getElementById("bk-" + i);
+        if (bk) {
+          bk.textContent = fmt(p.bank);
+          bk.className = "bank-timer active-phase" + (p.bank < 30 && p.bank > 0 ? " warning" : "") + (p.bank <= 0 ? " zero" : "");
+        }
+        if (p.bank <= 0) {
+          p.active = false; p.phase = "idle";
+          clearInterval(intervalId); intervalId = null; activeIndex = null;
+          renderCards();
+        }
+      }
+    }
+  }
+
+  function adjustBank(i, delta) {
+    players[i].bank = Math.max(0, players[i].bank + delta);
+    const bk = document.getElementById("bk-" + i);
+    if (bk) {
+      bk.textContent = fmt(players[i].bank);
+      const isActive = players[i].phase === "bank" && players[i].active;
+      bk.className = "bank-timer" + (isActive ? " active-phase" : "") + (players[i].bank < 30 && players[i].bank > 0 ? " warning" : "") + (players[i].bank <= 0 ? " zero" : "");
+    }
+  }
+
+  function knockOut(i) {
+    if (!confirm("Knock out " + players[i].name + "?")) return;
+    if (activeIndex === i) { clearInterval(intervalId); intervalId = null; activeIndex = null; }
+    players[i].out = true; players[i].active = false; players[i].phase = "idle"; players[i].folded = false;
+    renderCards();
+  }
+
+  addPlayerRow("Player 1", 60);
+  addPlayerRow("Player 2", 60);
+  addPlayerRow("Player 3", 60);
+</script>
+</body>
+</html>
